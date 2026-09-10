@@ -19,15 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.5"
-          channel: stable
-      - run: pip install flet
-      - run: flet build web --base-url /Ali/ --no-rich-output
+
+      - run: pip install "flet[all]"
+
+      - name: build web
+        run: yes | flet build web --base-url /Ali/ --no-rich-output --verbose
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
