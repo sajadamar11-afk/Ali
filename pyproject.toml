@@ -1,0 +1,11 @@
+[project]
+name = "exam-maker"
+version = "1.0.0"
+description = "صانع النماذج الامتحانية"
+requires-python = ">=3.9"
+dependencies = ["flet"]
+
+[tool.flet]
+org = "com.sajad"
+product = "Exam Maker"
+company = "Sajad"
