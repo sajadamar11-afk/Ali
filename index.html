@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>صانع النماذج الامتحانية</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e4d8c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+:root{
+  --blue:#1e4d8c; --blue-d:#16386a; --red:#c62828; --green:#2e7d32;
+  --bg:#eef1f6; --card:#fff; --line:#d9dfe8; --txt:#16202e; --muted:#6b7684;
+}
+body.dark{
+  --bg:#12161c; --card:#1c232c; --line:#2c3644; --txt:#e6ecf3; --muted:#93a0b0;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; }
+body{
+  background:var(--bg); color:var(--txt);
+  font-family:-apple-system,"SF Arabic","Segoe UI",Tahoma,sans-serif;
+  font-size:15px; padding-bottom:96px;
+}
+header{
+  position:sticky; top:0; z-index:20; background:var(--blue); color:#fff;
+  padding:14px 16px; padding-top:calc(14px + env(safe-area-inset-top));
+  display:flex; justify-content:space-between; align-items:center;
+  box-shadow:0 2px 10px rgba(0,0,0,.15);
+}
+header h1{ font-size:17px; margin:0; font-weight:700; }
+header button{
+  background:rgba(255,255,255,.15); border:0; color:#fff; font-size:18px;
+  width:38px; height:38px; border-radius:10px;
+}
+main{ padding:12px; }
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:12px; margin-bottom:12px;
+}
+.card h2{ font-size:15px; color:var(--blue); margin:2px 0 10px; }
+body.dark .card h2{ color:#7fb0ef; }
+.f{ margin-bottom:9px; }
+.f label{ display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+input,textarea,select{
+  width:100%; font:inherit; font-size:15px; color:var(--txt);
+  background:transparent; border:1px solid var(--line); border-radius:10px;
+  padding:10px 11px; text-align:right; direction:rtl;
+}
+textarea{ min-height:74px; resize:vertical; }
+select{ -webkit-appearance:none; appearance:none;
+        background-image:linear-gradient(45deg,transparent 49%,var(--muted) 50%),
+                         linear-gradient(-45deg,transparent 49%,var(--muted) 50%);
+        background-size:6px 6px; background-position:14px 18px,19px 18px;
+        background-repeat:no-repeat; }
+input:focus,textarea:focus,select:focus{ outline:2px solid var(--blue); border-color:var(--blue); }
+.row{ display:flex; gap:8px; }
+.row>*{ flex:1; min-width:0; }
+.chk{ display:flex; align-items:center; gap:8px; margin:8px 0; font-size:14px; }
+.chk input{ width:20px; height:20px; flex:0 0 auto; }
+.qhead{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.qno{ font-weight:700; color:var(--blue); font-size:16px; }
+body.dark .qno{ color:#7fb0ef; }
+.icon{ background:none; border:0; font-size:20px; padding:4px 8px; color:var(--red); }
+.brow{ display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+.brow .bt{ flex:1 1 auto; min-width:0; }
+.brow .bm{ flex:0 0 74px; }
+.btn{
+  border:0; border-radius:12px; padding:13px 14px; font:inherit; font-weight:700;
+  font-size:15px; color:#fff; background:var(--blue); width:100%;
+}
+.btn.green{ background:var(--green); }
+.btn.ghost{ background:transparent; color:var(--blue); border:1px dashed var(--line);
+            font-weight:600; padding:9px; font-size:14px; }
+body.dark .btn.ghost{ color:#7fb0ef; }
+.btn.word{ background:#2b579a; }
+.btn.grey{ background:#546e7a; }
+#bar{
+  position:fixed; bottom:0; right:0; left:0; z-index:20;
+  background:var(--card); border-top:1px solid var(--line);
+  padding:10px 12px; padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  display:flex; gap:8px;
+}
+#bar .btn{ padding:13px 8px; font-size:14px; }
+#bar .btn.sm{ flex:0 0 52px; font-size:19px; padding:13px 0; }
+#overlay{
+  position:fixed; inset:0; z-index:50; background:#7b8494; display:none;
+  overflow:auto; -webkit-overflow-scrolling:touch;
+}
+#overlay.on{ display:block; }
+#ovbar{
+  position:sticky; top:0; background:var(--blue); color:#fff; display:flex; gap:8px;
+  padding:10px 12px; padding-top:calc(10px + env(safe-area-inset-top));
+}
+#ovbar .btn{ padding:11px; font-size:14px; }
+#paperwrap{ padding:12px; }
+#paper{ background:#fff; max-width:210mm; margin:0 auto; padding:6mm;
+        box-shadow:0 6px 24px rgba(0,0,0,.25); }
+.toast{
+  position:fixed; bottom:104px; right:16px; left:16px; z-index:60;
+  background:#263238; color:#fff; padding:13px 15px; border-radius:12px;
+  font-size:14px; text-align:center; opacity:0; transition:opacity .25s;
+  pointer-events:none;
+}
+.toast.on{ opacity:.97; }
+@media print{
+  header,main,#bar,#ovbar,.toast{ display:none !important; }
+  #overlay{ display:block !important; position:static; background:#fff; overflow:visible; }
+  #paperwrap{ padding:0; }
+  #paper{ box-shadow:none; max-width:none; margin:0; padding:6mm; }
+  @page{ size:A4 portrait; margin:10mm 9mm 8mm 9mm; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>صانع النماذج الامتحانية</h1>
+  <button id="themeBtn" title="المظهر">🌙</button>
+</header>
+
+<main>
+  <div class="card">
+    <h2>الترويسة الرسمية للامتحان</h2>
+    <div class="f"><label>اسم المدرسة</label><input id="school" placeholder="ثانوية ... الأهلية للبنين"></div>
+    <div class="f"><label>عنوان الامتحان</label><input id="title" placeholder="أسئلة امتحان نهاية الكورس الأول"></div>
+    <div class="row">
+      <div class="f"><label>الصف / المرحلة</label><input id="grade" placeholder="الأول متوسط"></div>
+      <div class="f"><label>المادة</label><input id="subject" placeholder="اللغة العربية"></div>
+    </div>
+    <div class="row">
+      <div class="f"><label>العام الدراسي / الدور</label><input id="year" placeholder="للعام الدراسي 2025-2026"></div>
+      <div class="f"><label>الرمز / الوقت</label><input id="code_time" placeholder="ساعتان"></div>
+    </div>
+    <div class="row">
+      <div class="f"><label>التاريخ</label><input id="date" placeholder="21 / 1 / 2026"></div>
+      <div class="f"><label>اسم مدرس المادة</label><input id="teacher" placeholder="الأستاذ ..."></div>
+    </div>
+    <div class="f"><label>ملاحظة عامة (أعلى الأسئلة)</label><input id="note" placeholder="ملاحظة: أجب عن خمسة أسئلة فقط"></div>
+    <div class="f"><label>عبارة التذييل</label><input id="wish"></div>
+    <label class="chk"><input type="checkbox" id="basmala" checked> إظهار البسملة</label>
+    <label class="chk"><input type="checkbox" id="signature"> خانة توقيع (إدارة المدرسة)</label>
+  </div>
+
+  <div class="card">
+    <h2>شكل الورقة</h2>
+    <div class="row">
+      <div class="f"><label>التباعد بين الأسئلة</label><select id="gap"></select></div>
+      <div class="f"><label>شكل الفاصل</label><select id="separator"></select></div>
+    </div>
+    <div class="row">
+      <div class="f"><label>خط الورقة</label><select id="font"></select></div>
+      <div class="f"><label>حجم الخط</label><select id="size"></select></div>
+    </div>
+  </div>
+
+  <div id="questions"></div>
+
+  <button class="btn green" id="addQ">+ إضافة سؤال رئيسي جديد</button>
+</main>
+
+<div id="bar">
+  <button class="btn" id="printBtn">🖨 معاينة وطباعة (PDF / A4)</button>
+  <button class="btn word" id="wordBtn">Word</button>
+  <button class="btn grey sm" id="saveBtn" title="حفظ">💾</button>
+  <button class="btn grey sm" id="loadBtn" title="استرجاع">📂</button>
+</div>
+
+<div id="overlay">
+  <div id="ovbar">
+    <button class="btn" id="doPrint">🖨 طباعة / حفظ PDF</button>
+    <button class="btn grey" id="closeOv">إغلاق</button>
+  </div>
+  <div id="paperwrap"><div id="paper"></div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<style id="paperStyle"></style>
+
+<script>
+/* ============================================================
+   engine.js — محرك ورقة الأسئلة
+   يبني: (1) الورقة HTML للطباعة   (2) ملف Word ‎.docx‎
+   لا يعتمد على أي مكتبة خارجية.
+   ============================================================ */
+
+const AR_LETTERS = ["أ","ب","ج","د","هـ","و","ز","ح","ط","ي",
+                    "ك","ل","م","ن","س","ع","ف","ص","ق","ر"];
+
+const SEPARATORS = {
+  dots:   "نقاط متقطعة  ( • • • • )",
+  stars:  "نجوم  ( ✵ ✵ ✵ ✵ )",
+  line:   "خط متصل  ( ———— )",
+  double: "خط مزدوج  ( ═══ )",
+  none:   "بدون فاصل",
+};
+
+const SPACING = {
+  compact: "متقاربة",
+  normal:  "عادية",
+  wide:    "متباعدة",
+  xwide:   "واسعة جداً",
+};
+
+const FONTS = {
+  traditional: "النسخ التقليدي",
+  amiri:       "أميري",
+  simplified:  "بسيط",
+  arial:       "عريض واضح",
+};
+
+const FONT_STACK = {
+  traditional: "'Traditional Arabic','Sakkal Majalla','Amiri','Scheherazade New',serif",
+  amiri:       "'Amiri','Scheherazade New','Traditional Arabic',serif",
+  simplified:  "'Simplified Arabic','Arabic Typesetting','Traditional Arabic',serif",
+  arial:       "'Arial','Tahoma','Segoe UI',sans-serif",
+};
+
+const GAP_MM = {
+  compact: { q:2,  head:1, br:1,   line:2, sep:3  },
+  normal:  { q:7,  head:2, br:2,   line:4, sep:5  },
+  wide:    { q:13, head:3, br:3.5, line:6, sep:7  },
+  xwide:   { q:20, head:4, br:5,   line:8, sep:10 },
+};
+
+function newBranch(){ return { text:"", mark:"" }; }
+function newQuestion(){
+  return { title:"", total:"", text:"", lines:0,
+           branches:[newBranch(), newBranch()] };
+}
+function newPaper(){
+  return {
+    school:"", title:"", grade:"", subject:"", year:"", code_time:"",
+    date:"", teacher:"", note:"",
+    basmala:true, signature:false,
+    wish:"مع تمنياتنا لكم بالنجاح والتوفيق",
+    separator:"dots", gap:"wide", font:"traditional", size:15,
+    questions:[newQuestion()],
+  };
+}
+
+function esc(t){
+  return String(t == null ? "" : t)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function multiline(t){ return esc(t).split("\n").join("<br>"); }
+
+function hasContent(q){
+  if ((q.title||"").trim() || (q.text||"").trim()) return true;
+  return (q.branches||[]).some(b => (b.text||"").trim());
+}
+
+/* ---------------------------------------------- ورقة HTML للطباعة */
+
+function paperCSS(d){
+  const g = GAP_MM[d.gap] || GAP_MM.wide;
+  const stack = FONT_STACK[d.font] || FONT_STACK.traditional;
+  return `
+#paper{ font-family:${stack}; font-size:${d.size}pt; color:#000;
+        direction:rtl; text-align:right; line-height:1.9; background:#fff; }
+#paper .sheet{ border:1.6px solid #000; padding:6mm; }
+#paper .head{ display:flex; align-items:flex-start; gap:4mm; }
+#paper .head .side{ width:33%; }
+#paper .head .mid{ width:34%; text-align:center; }
+#paper .head .lbl{ font-size:.82em; }
+#paper .head .big{ font-weight:700; }
+#paper .head .mid .bism{ font-size:.9em; margin-bottom:1mm; }
+#paper .head .mid .ttl{ font-weight:700; font-size:1.06em; }
+#paper .head .left{ text-align:left; }
+#paper .head .left div{ white-space:nowrap; }
+#paper hr.rule{ border:none; border-top:1.2px solid #000; margin:2.5mm 0; }
+#paper .note{ text-align:center; font-weight:700; text-decoration:underline;
+              text-underline-offset:3px; margin:1mm 0; }
+#paper .q{ break-inside:avoid; page-break-inside:avoid; margin-bottom:${g.q}mm; }
+#paper .qhead{ display:flex; justify-content:space-between; align-items:baseline;
+               font-weight:700; margin-bottom:${g.head}mm; }
+#paper .qhead .mark{ font-weight:400; font-size:.9em; white-space:nowrap; }
+#paper .qtext{ margin-right:6mm; }
+#paper .br{ margin-right:11mm; margin-top:${g.br}mm; display:flex;
+            justify-content:space-between; align-items:baseline; gap:4mm; }
+#paper .br .bt{ flex:1 1 auto; }
+#paper .br .bm{ font-size:.85em; white-space:nowrap; }
+#paper .dotline{ margin-right:11mm; margin-top:${g.line}mm;
+                 border-bottom:1.3px dotted #444; height:1.05em; }
+#paper .sep{ height:0; margin:${g.sep}mm 0; }
+#paper .sep.dots{ border-top:2px dotted #333; }
+#paper .sep.line{ border-top:1px solid #333; }
+#paper .sep.double{ border-top:3px double #333; }
+#paper .sep.stars{ border:none; text-align:center; height:auto;
+                   letter-spacing:.55em; color:#333; font-size:.8em; }
+#paper .foot{ margin-top:3mm; padding-top:2mm; border-top:1.2px solid #000;
+              display:flex; justify-content:space-between; align-items:flex-end; }
+#paper .foot .w{ font-style:italic; }
+#paper .sig{ margin-top:6mm; text-align:left; }
+#paper .sig .box{ display:inline-block; border:1px solid #000; width:55mm;
+                  height:20mm; text-align:center; font-size:.8em; padding-top:1mm; }
+`;
+}
+
+function sepHTML(kind){
+  if (kind === "none") return "";
+  if (kind === "stars")
+    return '<div class="sep stars">✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵</div>';
+  return `<div class="sep ${kind}"></div>`;
+}
+
+function buildPaper(d){
+  let right = '<div class="side">';
+  if (d.school)
+    right += `<div class="lbl">المدرسة</div><div class="big">${esc(d.school)}</div>`;
+  right += "</div>";
+
+  let mid = '<div class="mid">';
+  if (d.basmala) mid += '<div class="bism">بسم الله الرحمن الرحيم</div>';
+  if (d.title)   mid += `<div class="ttl">${esc(d.title)}</div>`;
+  if (d.year)    mid += `<div>${esc(d.year)}</div>`;
+  mid += "</div>";
+
+  let left = '<div class="side left">';
+  [["الصف","grade"],["المادة","subject"],["التاريخ","date"],["الزمن","code_time"]]
+    .forEach(([lbl,key]) => {
+      if (d[key]) left += `<div><span class="lbl">${lbl}:</span> ${esc(d[key])}</div>`;
+    });
+  left += "</div>";
+
+  let h = ['<div class="sheet">', '<div class="head">', right, mid, left,
+           '</div>', '<hr class="rule">'];
+
+  if (d.note){
+    h.push(`<div class="note">${esc(d.note)}</div>`);
+    h.push('<hr class="rule">');
+  }
+
+  const qs = (d.questions||[]).filter(hasContent);
+  h.push('<div class="body">');
+  qs.forEach((q, i) => {
+    h.push('<div class="q">');
+    let head = `السؤال /${i+1}`;
+    if ((q.title||"").trim()) head += `&nbsp;&nbsp;&nbsp;((${esc(q.title.trim())}))`;
+    const mark = String(q.total||"").trim()
+      ? `<span class="mark">(${esc(String(q.total).trim())} درجة)</span>` : "";
+    h.push(`<div class="qhead"><span>${head}</span>${mark}</div>`);
+
+    if ((q.text||"").trim())
+      h.push(`<div class="qtext">${multiline(q.text)}</div>`);
+
+    let n = 0;
+    (q.branches||[]).forEach(b => {
+      if (!(b.text||"").trim()) return;
+      const lab = n < AR_LETTERS.length ? AR_LETTERS[n] : String(n+1);
+      n++;
+      const bm = String(b.mark||"").trim()
+        ? `<span class="bm">(${esc(String(b.mark).trim())})</span>` : "";
+      h.push(`<div class="br"><span class="bt">${lab}) ${multiline(b.text)}</span>${bm}</div>`);
+    });
+
+    for (let k = 0; k < (parseInt(q.lines)||0); k++)
+      h.push('<div class="dotline"></div>');
+
+    h.push('</div>');
+    if (i < qs.length - 1) h.push(sepHTML(d.separator));
+  });
+  h.push('</div>');
+
+  h.push('<div class="foot">'
+    + `<div>${d.teacher ? "مدرس المادة: " + esc(d.teacher) : "&nbsp;"}</div>`
+    + `<div class="w">${esc(d.wish||"")}</div></div>`);
+
+  if (d.signature)
+    h.push('<div class="sig"><div class="box">توقيع إدارة المدرسة</div></div>');
+
+  h.push('</div>');
+  return h.join("");
+}
+
+/* ---------------------------------------------- ملف Word ‎.docx‎ */
+
+const MM_TW = 56.7;
+const PAGE_W = 11906, PAGE_H = 16838, MARGIN = 624;
+const USABLE = PAGE_W - MARGIN * 2;
+const W_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+const GAP_TW = {
+  compact:{ q:110, br:60,  line:115 },
+  normal: { q:400, br:115, line:230 },
+  wide:   { q:740, br:200, line:340 },
+  xwide:  { q:1130,br:285, line:450 },
+};
+const SEP_W = { dots:"dotted", line:"single", double:"double", stars:null, none:null };
+const FONT_CS = { traditional:"Traditional Arabic", amiri:"Amiri",
+                  simplified:"Simplified Arabic", arial:"Arial" };
+
+function xesc(t){
+  return String(t == null ? "" : t)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+
+function wRun(text, o){
+  o = o || {};
+  let rpr = "<w:rtl/>";
+  if (o.bold)   rpr += "<w:b/><w:bCs/>";
+  if (o.italic) rpr += "<w:i/><w:iCs/>";
+  if (o.under)  rpr += '<w:u w:val="single"/>';
+  if (o.color)  rpr += `<w:color w:val="${o.color}"/>`;
+  if (o.size)   rpr += `<w:sz w:val="${o.size}"/><w:szCs w:val="${o.size}"/>`;
+  const parts = String(text == null ? "" : text).split("\n")
+    .map((l, i) => (i ? "<w:br/>" : "") + `<w:t xml:space="preserve">${xesc(l)}</w:t>`)
+    .join("");
+  return `<w:r><w:rPr>${rpr}</w:rPr>${parts}</w:r>`;
+}
+
+function wPara(runs, o){
+  o = o || {};
+  const align = o.align || "right";
+  let p = "<w:pPr><w:bidi/>";
+  if (o.border)
+    p += `<w:pBdr><w:bottom w:val="${o.border[0]}" w:sz="${o.border[1]}" `
+       + `w:space="1" w:color="${o.border[2]}"/></w:pBdr>`;
+  p += `<w:spacing w:before="${o.before||0}" w:after="${o.after||0}"`;
+  if (o.line) p += ` w:line="${o.line}" w:lineRule="auto"`;
+  p += "/>";
+  if (o.indent) p += `<w:ind w:left="${o.indent}" w:right="${o.indent}"/>`;
+  p += `<w:jc w:val="${align}"/></w:pPr>`;
+  return `<w:p>${p}${runs||""}</w:p>`;
+}
+
+function wCell(width, body){
+  return `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/>`
+       + `<w:vAlign w:val="top"/></w:tcPr>${body || wPara("")}</w:tc>`;
+}
+
+function wTable(widths, cells){
+  const borders = "<w:tblBorders>"
+    + ["top","left","bottom","right","insideH","insideV"]
+        .map(s => `<w:${s} w:val="none" w:sz="0" w:space="0" w:color="auto"/>`).join("")
+    + "</w:tblBorders>";
+  const grid = widths.map(w => `<w:gridCol w:w="${w}"/>`).join("");
+  const total = widths.reduce((a,b) => a+b, 0);
+  return `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:bidiVisual/>`
+    + borders
+    + '<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="40" w:type="dxa"/>'
+    + '<w:bottom w:w="0" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar>'
+    + '<w:tblLayout w:type="fixed"/></w:tblPr>'
+    + `<w:tblGrid>${grid}</w:tblGrid><w:tr>${cells.join("")}</w:tr></w:tbl>`;
+}
+
+function wHr(before, after){
+  return wPara("", { before: before==null?60:before, after: after==null?60:after,
+                     border:["single",8,"000000"] });
+}
+
+function buildDocumentXml(d){
+  const sz = (parseInt(d.size)||15) * 2;
+  const small = Math.max(sz - 4, 14);
+  const g = GAP_TW[d.gap] || GAP_TW.wide;
+  const out = [];
+
+  const w3 = Math.floor(USABLE/3);
+  let right = "";
+  if (d.school)
+    right = wPara(wRun("المدرسة",{size:small}), {after:20})
+          + wPara(wRun(d.school,{bold:true,size:sz}));
+  let mid = "";
+  if (d.basmala) mid += wPara(wRun("بسم الله الرحمن الرحيم",{size:small}),
+                              {align:"center", after:40});
+  if (d.title)   mid += wPara(wRun(d.title,{bold:true,size:sz+2}),
+                              {align:"center", after:40});
+  if (d.year)    mid += wPara(wRun(d.year,{size:sz}), {align:"center"});
+  let left = "";
+  [["الصف","grade"],["المادة","subject"],["التاريخ","date"],["الزمن","code_time"]]
+    .forEach(([lbl,key]) => {
+      if (d[key]) left += wPara(wRun(`${lbl}: ${d[key]}`,{size:small}),
+                                {align:"left", after:30});
+    });
+
+  out.push(wTable([w3, USABLE-2*w3, w3],
+    [wCell(w3,right), wCell(USABLE-2*w3,mid), wCell(w3,left)]));
+  out.push(wHr(120,60));
+
+  if (d.note){
+    out.push(wPara(wRun(d.note,{bold:true,size:sz,under:true}),
+                   {align:"center", after:60}));
+    out.push(wHr(0,200));
+  }
+
+  const qs = (d.questions||[]).filter(hasContent);
+  const wm = 1900, wq = USABLE - wm;
+  qs.forEach((q,i) => {
+    let head = `السؤال /${i+1}`;
+    if ((q.title||"").trim()) head += `     ((${q.title.trim()}))`;
+    const mark = String(q.total||"").trim()
+      ? `(${String(q.total).trim()} درجة)` : "";
+    out.push(wTable([wq,wm], [
+      wCell(wq, wPara(wRun(head,{bold:true,size:sz}))),
+      wCell(wm, wPara(wRun(mark,{size:small}), {align:"left"})),
+    ]));
+
+    if ((q.text||"").trim())
+      out.push(wPara(wRun(q.text,{size:sz}),
+                     {after:60, indent:Math.round(3*MM_TW), line:340}));
+
+    let n = 0;
+    (q.branches||[]).forEach(b => {
+      if (!(b.text||"").trim()) return;
+      const lab = n < AR_LETTERS.length ? AR_LETTERS[n] : String(n+1);
+      n++;
+      let txt = `${lab}) ${b.text.trim()}`;
+      if (String(b.mark||"").trim()) txt += `      (${String(b.mark).trim()})`;
+      out.push(wPara(wRun(txt,{size:sz}),
+                     {after:g.br, indent:Math.round(7*MM_TW), line:340}));
+    });
+
+    for (let k = 0; k < (parseInt(q.lines)||0); k++)
+      out.push(wPara("", {after:g.line, indent:Math.round(7*MM_TW),
+                          border:["dotted",6,"555555"]}));
+
+    if (i < qs.length-1){
+      const style = SEP_W[d.separator];
+      if (d.separator === "stars")
+        out.push(wPara(wRun("✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵ ✵",{size:small,color:"555555"}),
+                       {align:"center", before:Math.floor(g.q/2), after:Math.floor(g.q/2)}));
+      else if (style)
+        out.push(wPara("", {before:Math.floor(g.q/2), after:Math.floor(g.q/2),
+                            border:[style,8,"333333"]}));
+      else out.push(wPara("", {after:g.q}));
+    } else out.push(wPara("", {after:g.q}));
+  });
+
+  out.push(wHr(60,80));
+  const wf = Math.floor(USABLE/2);
+  out.push(wTable([wf, USABLE-wf], [
+    wCell(wf, wPara(wRun(d.teacher ? "مدرس المادة: " + d.teacher : "", {size:small}))),
+    wCell(USABLE-wf, wPara(wRun(d.wish||"",{size:small,italic:true}), {align:"left"})),
+  ]));
+
+  if (d.signature){
+    out.push(wPara("", {after:200}));
+    out.push(wPara(wRun("توقيع إدارة المدرسة",{size:small}),
+                   {align:"left", before:400, border:["single",6,"000000"]}));
+  }
+
+  out.push(wPara(""));   // فقرة إلزامية بعد آخر جدول
+
+  const pgB = ["top","left","bottom","right"]
+    .map(s => `<w:${s} w:val="single" w:sz="12" w:space="20" w:color="000000"/>`).join("");
+  out.push(`<w:sectPr><w:pgSz w:w="${PAGE_W}" w:h="${PAGE_H}"/>`
+    + `<w:pgMar w:top="${MARGIN}" w:right="${MARGIN}" w:bottom="${MARGIN}" `
+    + `w:left="${MARGIN}" w:header="0" w:footer="0" w:gutter="0"/>`
+    + `<w:pgBorders w:offsetFrom="page">${pgB}</w:pgBorders>`
+    + `<w:bidi/><w:rtlGutter/></w:sectPr>`);
+
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + `<w:document ${W_NS}><w:body>${out.join("")}</w:body></w:document>`;
+}
+
+function buildStylesXml(d){
+  const f = FONT_CS[d.font] || "Traditional Arabic";
+  const sz = (parseInt(d.size)||15) * 2;
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + `<w:styles ${W_NS}><w:docDefaults><w:rPrDefault><w:rPr>`
+    + `<w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:cs="${f}"/>`
+    + `<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/><w:lang w:bidi="ar-IQ"/>`
+    + '</w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:bidi/><w:jc w:val="right"/>'
+    + '<w:spacing w:after="0" w:line="276" w:lineRule="auto"/>'
+    + '</w:pPr></w:pPrDefault></w:docDefaults>'
+    + '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
+    + '<w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>';
+}
+
+const CONTENT_TYPES =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
++ '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
++ '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
++ '<Default Extension="xml" ContentType="application/xml"/>'
++ '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
++ '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
++ '</Types>';
+
+const ROOT_RELS =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
++ '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
++ '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
++ '</Relationships>';
+
+const DOC_RELS =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
++ '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
++ '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
++ '</Relationships>';
+
+/* ---- ZIP بدون ضغط (store) — كافي تماماً لملفات docx ---- */
+
+let CRC_TABLE = null;
+function crcTable(){
+  if (CRC_TABLE) return CRC_TABLE;
+  CRC_TABLE = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    CRC_TABLE[n] = c >>> 0;
+  }
+  return CRC_TABLE;
+}
+function crc32(buf){
+  const t = crcTable();
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = t[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function utf8(str){
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(str);
+  return Uint8Array.from(Buffer.from(str, "utf8"));
+}
+
+function zipStore(files){
+  const chunks = [], central = [];
+  let offset = 0;
+
+  const u16 = v => [v & 0xFF, (v>>>8) & 0xFF];
+  const u32 = v => [v & 0xFF, (v>>>8) & 0xFF, (v>>>16) & 0xFF, (v>>>24) & 0xFF];
+
+  files.forEach(f => {
+    const name = utf8(f.name);
+    const data = typeof f.data === "string" ? utf8(f.data) : f.data;
+    const crc = crc32(data);
+
+    const local = [].concat(
+      u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+      u32(crc), u32(data.length), u32(data.length),
+      u16(name.length), u16(0));
+    chunks.push(Uint8Array.from(local), name, data);
+
+    central.push([].concat(
+      u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+      u32(crc), u32(data.length), u32(data.length),
+      u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset)));
+    central.push(name);
+
+    offset += local.length + name.length + data.length;
+  });
+
+  const cdChunks = [];
+  let cdSize = 0;
+  for (let i = 0; i < central.length; i += 2){
+    const head = Uint8Array.from(central[i]);
+    const name = central[i+1];
+    cdChunks.push(head, name);
+    cdSize += head.length + name.length;
+  }
+
+  const eocd = Uint8Array.from([].concat(
+    u32(0x06054b50), u16(0), u16(0),
+    u16(files.length), u16(files.length),
+    u32(cdSize), u32(offset), u16(0)));
+
+  const all = chunks.concat(cdChunks, [eocd]);
+  const total = all.reduce((a,b) => a + b.length, 0);
+  const out = new Uint8Array(total);
+  let p = 0;
+  all.forEach(c => { out.set(c, p); p += c.length; });
+  return out;
+}
+
+function buildDocx(d){
+  return zipStore([
+    { name:"[Content_Types].xml",          data: CONTENT_TYPES },
+    { name:"_rels/.rels",                  data: ROOT_RELS },
+    { name:"word/_rels/document.xml.rels", data: DOC_RELS },
+    { name:"word/styles.xml",              data: buildStylesXml(d) },
+    { name:"word/document.xml",            data: buildDocumentXml(d) },
+  ]);
+}
+
+
+/* ================= ربط الواجهة ================= */
+
+const $ = id => document.getElementById(id);
+const HEAD_FIELDS = ["school","title","grade","subject","year","code_time",
+                     "date","teacher","note","wish"];
+const STORE = "exam_maker_project";
+
+function fillSelect(el, obj, def){
+  el.innerHTML = "";
+  Object.keys(obj).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = obj[k];
+    el.appendChild(o);
+  });
+  el.value = def;
+}
+
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("on"), 2600);
+}
+
+/* ---------------- بطاقات الأسئلة ---------------- */
+
+function branchRow(b){
+  const row = document.createElement("div");
+  row.className = "brow";
+  row.innerHTML =
+    '<input class="bt" placeholder="اكتب نص الفرع هنا...">' +
+    '<input class="bm" placeholder="الدرجة">' +
+    '<button class="icon" type="button">✕</button>';
+  row.querySelector(".bt").value = (b && b.text) || "";
+  row.querySelector(".bm").value = (b && b.mark) || "";
+  row.querySelector("button").onclick = () => row.remove();
+  return row;
+}
+
+function questionCard(q){
+  const card = document.createElement("div");
+  card.className = "card qcard";
+  card.innerHTML =
+    '<div class="qhead"><span class="qno">السؤال /1</span>' +
+      '<button class="icon del" type="button">🗑</button></div>' +
+    '<div class="f"><label>عنوان السؤال</label>' +
+      '<input class="q-title" placeholder="مثال: أقسام الكلام، أو عرّف ما يأتي"></div>' +
+    '<div class="row">' +
+      '<div class="f"><label>درجة السؤال</label><input class="q-total" placeholder="20"></div>' +
+      '<div class="f"><label>أسطر إجابة</label><select class="q-lines"></select></div>' +
+    '</div>' +
+    '<div class="f"><label>نص السؤال</label>' +
+      '<textarea class="q-text" placeholder="اكتب نص السؤال هنا..."></textarea></div>' +
+    '<div class="f"><label>الفروع</label><div class="branches"></div></div>' +
+    '<button class="btn ghost addB" type="button">+ إضافة فرع</button>';
+
+  const lines = card.querySelector(".q-lines");
+  [0,1,2,3,4,5,6,8,10].forEach(n => {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n;
+    lines.appendChild(o);
+  });
+
+  card.querySelector(".q-title").value = (q && q.title) || "";
+  card.querySelector(".q-total").value = (q && q.total) || "";
+  card.querySelector(".q-text").value  = (q && q.text)  || "";
+  lines.value = (q && q.lines) || 0;
+
+  const box = card.querySelector(".branches");
+  const brs = (q && q.branches && q.branches.length) ? q.branches
+            : [{text:"",mark:""},{text:"",mark:""}];
+  brs.forEach(b => box.appendChild(branchRow(b)));
+
+  card.querySelector(".addB").onclick = () => box.appendChild(branchRow());
+  card.querySelector(".del").onclick = () => {
+    if (document.querySelectorAll(".qcard").length === 1)
+      return toast("لازم يبقى سؤال واحد على الأقل");
+    card.remove();
+    renumber();
+  };
+  return card;
+}
+
+function renumber(){
+  document.querySelectorAll(".qcard").forEach((c, i) => {
+    c.querySelector(".qno").textContent = "السؤال /" + (i + 1);
+  });
+}
+
+function addQuestion(q){
+  $("questions").appendChild(questionCard(q));
+  renumber();
+}
+
+/* ---------------- قراءة / كتابة البيانات ---------------- */
+
+function collect(){
+  const d = newPaper();
+  HEAD_FIELDS.forEach(k => d[k] = $(k).value.trim());
+  d.basmala   = $("basmala").checked;
+  d.signature = $("signature").checked;
+  d.gap       = $("gap").value;
+  d.separator = $("separator").value;
+  d.font      = $("font").value;
+  d.size      = parseInt($("size").value) || 15;
+  d.questions = [].map.call(document.querySelectorAll(".qcard"), c => ({
+    title: c.querySelector(".q-title").value.trim(),
+    total: c.querySelector(".q-total").value.trim(),
+    text:  c.querySelector(".q-text").value,
+    lines: parseInt(c.querySelector(".q-lines").value) || 0,
+    branches: [].map.call(c.querySelectorAll(".brow"), r => ({
+      text: r.querySelector(".bt").value.trim(),
+      mark: r.querySelector(".bm").value.trim(),
+    })),
+  }));
+  return d;
+}
+
+function apply(d){
+  HEAD_FIELDS.forEach(k => $(k).value = d[k] || "");
+  $("basmala").checked   = !!d.basmala;
+  $("signature").checked = !!d.signature;
+  $("gap").value       = d.gap || "wide";
+  $("separator").value = d.separator || "dots";
+  $("font").value      = d.font || "traditional";
+  $("size").value      = String(d.size || 15);
+  $("questions").innerHTML = "";
+  (d.questions && d.questions.length ? d.questions : [newQuestion()])
+    .forEach(addQuestion);
+}
+
+/* ---------------- الأفعال ---------------- */
+
+function showPreview(){
+  const d = collect();
+  $("paperStyle").textContent = paperCSS(d);
+  $("paper").innerHTML = buildPaper(d);
+  $("overlay").classList.add("on");
+  window.scrollTo(0, 0);
+}
+
+function download(bytes, filename, mime){
+  const blob = new Blob([bytes], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function doWord(){
+  try{
+    const d = collect();
+    const name = ((d.title || "ورقة الأسئلة").replace(/[\/\\:*?"<>|]/g, "-")) + ".docx";
+    download(buildDocx(d), name,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    toast("تم تنزيل ملف Word ✅");
+  }catch(err){
+    toast("خطأ بتصدير Word: " + err.message);
+  }
+}
+
+function doSave(){
+  try{
+    localStorage.setItem(STORE, JSON.stringify(collect()));
+    toast("تم حفظ المشروع بالجهاز ✅");
+  }catch(err){
+    toast("ما زبط الحفظ: " + err.message);
+  }
+}
+
+function doLoad(){
+  try{
+    const raw = localStorage.getItem(STORE);
+    if (!raw) return toast("ماكو مشروع محفوظ");
+    const d = Object.assign(newPaper(), JSON.parse(raw));
+    apply(d);
+    toast("تم استرجاع المشروع ✅");
+  }catch(err){
+    toast("ما زبط الاسترجاع: " + err.message);
+  }
+}
+
+/* ---------------- التشغيل ---------------- */
+
+function init(){
+  fillSelect($("gap"), SPACING, "wide");
+  fillSelect($("separator"), SEPARATORS, "dots");
+  fillSelect($("font"), FONTS, "traditional");
+  const sizes = {};
+  for (let i = 11; i <= 22; i++) sizes[i] = String(i);
+  fillSelect($("size"), sizes, "15");
+
+  $("wish").value = "مع تمنياتنا لكم بالنجاح والتوفيق";
+
+  $("addQ").onclick    = () => addQuestion();
+  $("printBtn").onclick = showPreview;
+  $("wordBtn").onclick  = doWord;
+  $("saveBtn").onclick  = doSave;
+  $("loadBtn").onclick  = doLoad;
+  $("closeOv").onclick  = () => $("overlay").classList.remove("on");
+  $("doPrint").onclick  = () => window.print();
+
+  $("themeBtn").onclick = () => {
+    document.body.classList.toggle("dark");
+    const on = document.body.classList.contains("dark");
+    $("themeBtn").textContent = on ? "☀️" : "🌙";
+    try{ localStorage.setItem("exam_theme", on ? "dark" : "light"); }catch(e){}
+  };
+  try{
+    if (localStorage.getItem("exam_theme") === "dark"){
+      document.body.classList.add("dark");
+      $("themeBtn").textContent = "☀️";
+    }
+  }catch(e){}
+
+  const saved = (function(){
+    try{ return localStorage.getItem(STORE); }catch(e){ return null; }
+  })();
+  if (saved){
+    try{ apply(Object.assign(newPaper(), JSON.parse(saved))); return; }catch(e){}
+  }
+  addQuestion();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+
+if ("serviceWorker" in navigator)
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
+
+</script>
+</body>
+</html>

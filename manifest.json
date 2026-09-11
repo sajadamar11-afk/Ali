@@ -1,0 +1,15 @@
+{
+  "name": "صانع النماذج الامتحانية",
+  "short_name": "صانع الأسئلة",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef1f6",
+  "theme_color": "#1e4d8c",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
