@@ -31,6 +31,74 @@ import word_export
 Icons = getattr(ft, "Icons", None) or ft.icons
 Colors = getattr(ft, "Colors", None) or ft.colors
 
+# ============================================================
+#  طبقة توافق مع كل إصدارات Flet (القديمة والجديدة)
+#  كل دالة هنا تجرّب الواجهة الجديدة وترجع للقديمة إذا ما اشتغلت.
+# ============================================================
+
+def PAD(left=0, top=0, right=0, bottom=0):
+    """حشوة تشتغل بأي إصدار — ترجع رقم إذا الصنف غير متوفر."""
+    for maker in (
+        lambda: ft.Padding(left, top, right, bottom),
+        lambda: ft.padding.only(left=left, top=top, right=right, bottom=bottom),
+    ):
+        try:
+            return maker()
+        except Exception:
+            continue
+    return max(left, top, right, bottom)
+
+
+def OPT(key, text=None):
+    """خيار قائمة منسدلة — ft.DropdownOption الجديد أو ft.dropdown.Option القديم."""
+    for maker in (
+        lambda: ft.DropdownOption(key=key, text=text if text is not None else key),
+        lambda: ft.dropdown.Option(key, text) if text is not None
+        else ft.dropdown.Option(key),
+    ):
+        try:
+            return maker()
+        except Exception:
+            continue
+    return key
+
+
+def SAFE(cls, **kw):
+    """ينشئ عنصراً ويشيل أي وسيط غير مدعوم بهذا الإصدار بدل ما يطيح."""
+    kw = {k: v for k, v in kw.items() if v is not None}
+    while True:
+        try:
+            return cls(**kw)
+        except TypeError as e:
+            msg = str(e)
+            dropped = None
+            for k in list(kw):
+                if ("'%s'" % k) in msg or ('"%s"' % k) in msg:
+                    dropped = k
+                    break
+            if dropped is None:
+                raise
+            kw.pop(dropped)
+
+
+def TXT(value, **kw):
+    return SAFE(ft.Text, value=value, **kw)
+
+
+def OPACITY(op, color):
+    try:
+        return Colors.with_opacity(op, color)
+    except Exception:
+        return color
+
+
+def BORDER_TOP(color="#dfe3e8", w=1):
+    try:
+        return ft.border.only(top=ft.BorderSide(w, color))
+    except Exception:
+        return None
+
+
 BLUE = "#1e4d8c"
 RED = "#c62828"
 GREEN = "#2e7d32"
@@ -101,7 +169,7 @@ def save_file(page, filename, data: bytes):
 
 
 def toast(page, msg):
-    sb = ft.SnackBar(content=ft.Text(msg, rtl=True), duration=2500)
+    sb = SAFE(ft.SnackBar, content=TXT(msg, rtl=True), duration=2500)
     try:
         page.open(sb)               # Flet الحديث
     except Exception:
@@ -112,7 +180,8 @@ def toast(page, msg):
 
 # ------------------------------------------------ عناصر مساعدة
 def tf(label, hint="", value="", multiline=False, lines=3, width=None):
-    return ft.TextField(
+    return SAFE(
+        ft.TextField,
         label=label, hint_text=hint, value=value or "",
         multiline=multiline, min_lines=lines if multiline else 1,
         max_lines=lines + 4 if multiline else 1,
@@ -127,16 +196,17 @@ class QCard:
         self.app = app
         self.branches = []
 
-        self.no = ft.Text("السؤال /1", weight=ft.FontWeight.BOLD,
-                          size=16, color=BLUE, rtl=True)
+        self.no = TXT("السؤال /1", weight=ft.FontWeight.BOLD,
+                      size=16, color=BLUE, rtl=True)
         self.title = tf("عنوان السؤال", "مثال: أقسام الكلام", data.get("title", ""))
         self.total = tf("درجة السؤال", "20", str(data.get("total", "") or ""), width=120)
         self.text = tf("نص السؤال", "اكتب نص السؤال هنا...",
                        data.get("text", ""), multiline=True, lines=3)
-        self.lines = ft.Dropdown(
+        self.lines = SAFE(
+            ft.Dropdown,
             label="أسطر إجابة", width=120, dense=True, text_size=13,
             value=str(data.get("lines", 0) or 0),
-            options=[ft.dropdown.Option(str(i)) for i in (0, 1, 2, 3, 4, 5, 6, 8, 10)])
+            options=[OPT(str(i)) for i in (0, 1, 2, 3, 4, 5, 6, 8, 10)])
 
         self.bcol = ft.Column(spacing=6, tight=True)
 
@@ -154,7 +224,7 @@ class QCard:
                     self.title,
                     ft.Row(spacing=8, controls=[self.total, self.lines]),
                     self.text,
-                    ft.Text("الفروع:", size=12, color=Colors.GREY, rtl=True),
+                    TXT("الفروع:", size=12, color=Colors.GREY, rtl=True),
                     self.bcol,
                     ft.TextButton("+ إضافة فرع", icon=Icons.ADD,
                                   on_click=lambda e: self.add_branch(update=True)),
@@ -229,26 +299,30 @@ class MobileApp:
         self.cb_sig = ft.Checkbox(label="خانة توقيع (إدارة المدرسة)", value=False)
         self.cb_bism = ft.Checkbox(label="إظهار البسملة", value=True)
 
-        self.dd_sep = ft.Dropdown(
+        self.dd_sep = SAFE(
+            ft.Dropdown,
             label="شكل الفاصل", dense=True, text_size=13, value="dots",
-            options=[ft.dropdown.Option(k, v) for k, v in paper.SEPARATORS.items()])
-        self.dd_gap = ft.Dropdown(
+            options=[OPT(k, v) for k, v in paper.SEPARATORS.items()])
+        self.dd_gap = SAFE(
+            ft.Dropdown,
             label="التباعد بين الأسئلة", dense=True, text_size=13, value="wide",
-            options=[ft.dropdown.Option(k, v) for k, v in paper.SPACING.items()])
-        self.dd_font = ft.Dropdown(
+            options=[OPT(k, v) for k, v in paper.SPACING.items()])
+        self.dd_font = SAFE(
+            ft.Dropdown,
             label="خط الورقة", dense=True, text_size=13, value="traditional",
-            options=[ft.dropdown.Option(k, v) for k, v in paper.FONTS.items()])
-        self.dd_size = ft.Dropdown(
+            options=[OPT(k, v) for k, v in paper.FONTS.items()])
+        self.dd_size = SAFE(
+            ft.Dropdown,
             label="الحجم", dense=True, text_size=13, value="15", width=95,
-            options=[ft.dropdown.Option(str(i)) for i in range(11, 23)])
+            options=[OPT(str(i)) for i in range(11, 23)])
 
         self.qcol = ft.Column(spacing=10, tight=True)
 
         header = ft.Container(
-            bgcolor=BLUE, padding=ft.padding.symmetric(14, 16),
+            bgcolor=BLUE, padding=PAD(16, 14, 16, 14),
             content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[
-                ft.Text("صانع النماذج الامتحانية", color="#fff",
-                        size=18, weight=ft.FontWeight.BOLD, rtl=True),
+                TXT("صانع النماذج الامتحانية", color="#fff",
+                    size=18, weight=ft.FontWeight.BOLD, rtl=True),
                 ft.IconButton(Icons.DARK_MODE, icon_color="#fff",
                               tooltip="تبديل المظهر", on_click=self.toggle_theme),
             ]))
@@ -259,8 +333,8 @@ class MobileApp:
                 ft.Container(
                     padding=12,
                     content=ft.Column(spacing=8, tight=True, controls=[
-                        ft.Text("الترويسة الرسمية للامتحان", size=16,
-                                weight=ft.FontWeight.BOLD, color=BLUE, rtl=True),
+                        TXT("الترويسة الرسمية للامتحان", size=16,
+                            weight=ft.FontWeight.BOLD, color=BLUE, rtl=True),
                         self.f["school"], self.f["title"],
                         ft.Row(spacing=8, controls=[
                             ft.Container(self.f["grade"], expand=True),
@@ -280,19 +354,19 @@ class MobileApp:
                             ft.Container(self.dd_font, expand=True)]),
                         self.dd_size,
                     ])),
-                ft.Container(padding=ft.padding.symmetric(0, 12), content=self.qcol),
+                ft.Container(padding=PAD(12, 0, 12, 0), content=self.qcol),
                 ft.Container(
                     padding=12,
                     content=ft.ElevatedButton(
                         "+  إضافة سؤال رئيسي جديد", bgcolor=GREEN, color="#fff",
-                        height=46, width=10000,
+                        height=46, expand=True,
                         on_click=lambda e: self.add_question(update=True))),
                 ft.Container(height=90),
             ])
 
         bottom = ft.Container(
-            bgcolor=Colors.with_opacity(.96, "#ffffff"),
-            padding=10, border=ft.border.only(top=ft.BorderSide(1, "#dfe3e8")),
+            bgcolor=OPACITY(.96, "#ffffff"),
+            padding=10, border=BORDER_TOP(),
             content=ft.Row(spacing=8, controls=[
                 ft.Container(expand=True, content=ft.ElevatedButton(
                     "🖨  معاينة وطباعة (PDF / A4)", bgcolor=BLUE, color="#fff",
@@ -412,4 +486,7 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    try:
+        ft.run(main)          # Flet الحديث
+    except AttributeError:
+        ft.app(target=main)   # Flet الأقدم
