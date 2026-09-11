@@ -105,67 +105,136 @@ GREEN = "#2e7d32"
 STORE_KEY = "exam_maker.project"
 
 
-# ------------------------------------------------ فتح الورقة للطباعة
-def open_paper(page, html):
-    """
-    يفتح الورقة بنافذة/تبويب جديد حتى يطبعها المستخدم (Ctrl+P أو مشاركة ← طباعة).
-    يجرب ثلاث طرق حسب البيئة (متصفح / سطح مكتب / موبايل).
-    """
-    # 1) داخل المتصفح (نسخة flet build web تشتغل على Pyodide)
-    try:
-        import js  # متوفر فقط داخل المتصفح
-        blob = js.Blob.new([html], {"type": "text/html;charset=utf-8"})
-        url = js.URL.createObjectURL(blob)
-        js.window.open(url, "_blank")
-        return True, ""
-    except Exception:
-        pass
+# ------------------------------------------------ فتح/تنزيل الملفات
+# بايثون داخل المتصفح ممكن يشتغل بمعزل (worker) وما يوصل لـ window/document.
+# لذلك نجرّب كل الطرق بالترتيب ونسجّل نتيجة كل وحدة حتى نعرف شنو نجح.
 
-    # 2) سطح مكتب / خادم محلي
+LOG = []          # سجل آخر محاولة — يُعرض للمستخدم عند الفشل
+
+
+def _try(name, fn):
     try:
+        r = fn()
+        LOG.append("✅ %s" % name)
+        return True, r
+    except Exception as e:
+        LOG.append("❌ %s → %s: %s" % (name, type(e).__name__, str(e)[:90]))
+        return False, None
+
+
+def _blob_url(data, mime):
+    """ينشئ رابط blob من نص أو bytes."""
+    import js
+    if isinstance(data, str):
+        payload = data
+    else:
+        payload = js.Uint8Array.new(len(data))
+        for i, b in enumerate(data):
+            payload[i] = b
+    parts = js.Array.new()
+    parts.push(payload)
+    try:
+        from pyodide.ffi import to_js
+        opts = to_js({"type": mime}, dict_converter=js.Object.fromEntries)
+        blob = js.Blob.new(parts, opts)
+    except Exception:
+        blob = js.Blob.new(parts)
+    return js.URL.createObjectURL(blob)
+
+
+def deliver(page, data, mime, filename, download=False):
+    """
+    يوصّل الملف للمستخدم بأي طريقة متاحة.
+    يرجّع (نجح؟, وصف).
+    """
+    del LOG[:]
+
+    # 1) رابط blob + فتحه عن طريق Flet نفسه (يشتغل حتى لو ما نوصل لـ window)
+    ok, url = _try("blob + launch_url", lambda: _blob_url(data, mime))
+    if ok and url:
+        ok2, _ = _try("launch_url", lambda: page.launch_url(url))
+        if ok2:
+            return True, "انفتح بتبويب جديد"
+
+        # 2) رابط تنزيل بعنصر <a>
+        def _anchor():
+            import js
+            a = js.document.createElement("a")
+            a.href = url
+            if download:
+                a.download = filename
+            a.target = "_blank"
+            js.document.body.appendChild(a)
+            a.click()
+            js.document.body.removeChild(a)
+            return True
+        ok3, _ = _try("anchor click", _anchor)
+        if ok3:
+            return True, "تم التنزيل"
+
+        # 3) window.open مباشرة
+        def _winopen():
+            import js
+            js.window.open(url, "_blank")
+            return True
+        ok4, _ = _try("window.open", _winopen)
+        if ok4:
+            return True, "انفتح بتبويب جديد"
+
+    # 4) data URL عبر Flet
+    def _dataurl():
+        import base64
+        raw = data.encode("utf-8") if isinstance(data, str) else data
+        b64 = base64.b64encode(raw).decode("ascii")
+        page.launch_url("data:%s;base64,%s" % (mime, b64))
+        return True
+    ok5, _ = _try("data URL", _dataurl)
+    if ok5:
+        return True, "انفتح بتبويب جديد"
+
+    # 5) سطح مكتب
+    def _desktop():
         import webbrowser
         folder = os.path.join(os.path.expanduser("~"), "exam_maker")
         os.makedirs(folder, exist_ok=True)
-        path = os.path.join(folder, "exam_paper.html")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(html)
-        webbrowser.open("file:///" + os.path.abspath(path).replace("\\", "/"))
-        return True, path
-    except Exception as e:
-        return False, str(e)
-
-
-def save_file(page, filename, data: bytes):
-    """ينزّل ملف على الجهاز (متصفح) أو يحفظه بمجلد المستخدم (سطح مكتب)."""
-    # 1) داخل المتصفح
-    try:
-        import js
-        from pyodide.ffi import to_js
-        arr = js.Uint8Array.new(len(data))
-        for i, b in enumerate(data):
-            arr[i] = b
-        blob = js.Blob.new([arr], {"type": "application/octet-stream"})
-        url = js.URL.createObjectURL(blob)
-        a = js.document.createElement("a")
-        a.href = url
-        a.download = filename
-        js.document.body.appendChild(a)
-        a.click()
-        js.document.body.removeChild(a)
-        return True, filename
-    except Exception:
-        pass
-
-    # 2) سطح مكتب
-    try:
-        folder = os.path.join(os.path.expanduser("~"), "exam_maker")
-        os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, filename)
-        with open(path, "wb") as f:
-            f.write(data)
-        return True, path
-    except Exception as e:
-        return False, str(e)
+        mode, payload = ("w", data) if isinstance(data, str) else ("wb", data)
+        with open(path, mode, **({"encoding": "utf-8"} if mode == "w" else {})) as f:
+            f.write(payload)
+        if not download:
+            webbrowser.open("file:///" + os.path.abspath(path).replace("\\", "/"))
+        return path
+    ok6, path = _try("حفظ محلي", _desktop)
+    if ok6:
+        return True, str(path)
+
+    return False, "\n".join(LOG)
+
+
+def show_report(page, title, body):
+    """نافذة تعرض تفاصيل ما صار (للتشخيص عند الفشل)."""
+    dlg = SAFE(
+        ft.AlertDialog,
+        title=TXT(title, rtl=True, weight=ft.FontWeight.BOLD),
+        content=ft.Column(
+            [TXT(body, size=12, selectable=True)],
+            scroll=ft.ScrollMode.AUTO, height=300, width=340, tight=True),
+        actions=[ft.TextButton("تمام", on_click=lambda e: _close(page, dlg))],
+    )
+    try:
+        page.open(dlg)
+    except Exception:
+        page.dialog = dlg
+        dlg.open = True
+        page.update()
+
+
+def _close(page, dlg):
+    try:
+        page.close(dlg)
+    except Exception:
+        dlg.open = False
+        page.update()
 
 
 def toast(page, msg):
@@ -442,10 +511,17 @@ class MobileApp:
         self.page.update()
 
     def do_print(self, e):
-        html = paper.build_html(self.collect())
-        ok, info = open_paper(self.page, html)
-        toast(self.page, "افتح قائمة المشاركة ← طباعة ← حفظ بصيغة PDF"
-              if ok else "ما زبطت المعاينة: %s" % info)
+        try:
+            html = paper.build_html(self.collect())
+        except Exception as ex:
+            show_report(self.page, "خطأ ببناء الورقة", repr(ex))
+            return
+        ok, info = deliver(self.page, html, "text/html;charset=utf-8",
+                           "exam_paper.html", download=False)
+        if ok:
+            toast(self.page, "افتح قائمة المشاركة ← طباعة ← حفظ بصيغة PDF")
+        else:
+            show_report(self.page, "ما كدرت أفتح الورقة", info)
 
     def do_word(self, e):
         d = self.collect()
@@ -453,11 +529,16 @@ class MobileApp:
         try:
             data = word_export.build_docx_bytes(d)
         except Exception as ex:
-            toast(self.page, "ما زبط التصدير: %s" % ex)
+            show_report(self.page, "خطأ ببناء ملف Word", repr(ex))
             return
-        ok, info = save_file(self.page, name, data)
-        toast(self.page, "تم تنزيل ملف Word ✅  (%s)" % info if ok
-              else "ما زبط الحفظ: %s" % info)
+        ok, info = deliver(
+            self.page, data,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            name, download=True)
+        if ok:
+            toast(self.page, "تم تنزيل ملف Word ✅")
+        else:
+            show_report(self.page, "ما كدرت أنزّل ملف Word", info)
 
     def do_save(self, e):
         try:
