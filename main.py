@@ -109,7 +109,7 @@ STORE_KEY = "exam_maker.project"
 # بايثون داخل المتصفح ممكن يشتغل بمعزل (worker) وما يوصل لـ window/document.
 # لذلك نجرّب كل الطرق بالترتيب ونسجّل نتيجة كل وحدة حتى نعرف شنو نجح.
 
-LOG = []          # سجل آخر محاولة — يُعرض للمستخدم عند الفشل
+LOG = []          # سجل كل محاولة — يُعرض للمستخدم دائماً
 
 
 def _try(name, fn):
@@ -118,12 +118,29 @@ def _try(name, fn):
         LOG.append("✅ %s" % name)
         return True, r
     except Exception as e:
-        LOG.append("❌ %s → %s: %s" % (name, type(e).__name__, str(e)[:90]))
+        LOG.append("❌ %s → %s: %s" % (name, type(e).__name__, str(e)[:100]))
         return False, None
 
 
+def env_report():
+    """يفحص شنو متاح بهذي البيئة — أهم معلومة للتشخيص."""
+    out = []
+    try:
+        import js
+        out.append("js: موجود")
+        for attr in ("window", "document", "Blob", "URL", "Uint8Array", "Array"):
+            out.append("  js.%s: %s" % (attr, "نعم" if hasattr(js, attr) else "لا"))
+    except Exception as e:
+        out.append("js: غير متاح (%s)" % type(e).__name__)
+    try:
+        import pyodide          # noqa
+        out.append("pyodide: موجود")
+    except Exception:
+        out.append("pyodide: غير متاح")
+    return "\n".join(out)
+
+
 def _blob_url(data, mime):
-    """ينشئ رابط blob من نص أو bytes."""
     import js
     if isinstance(data, str):
         payload = data
@@ -144,69 +161,68 @@ def _blob_url(data, mime):
 
 def deliver(page, data, mime, filename, download=False):
     """
-    يوصّل الملف للمستخدم بأي طريقة متاحة.
-    يرجّع (نجح؟, وصف).
+    يوصّل الملف بأي طريقة متاحة. الترتيب مهم:
+    التنزيل بعنصر <a> أول لأنه ما يحتاج إذن نوافذ منبثقة (سفاري يحظرها).
+    يرجّع (نجح؟, تقرير).
     """
     del LOG[:]
+    LOG.append("— البيئة —")
+    LOG.append(env_report())
+    LOG.append("— المحاولات —")
 
-    # 1) رابط blob + فتحه عن طريق Flet نفسه (يشتغل حتى لو ما نوصل لـ window)
-    ok, url = _try("blob + launch_url", lambda: _blob_url(data, mime))
+    ok, url = _try("إنشاء رابط blob", lambda: _blob_url(data, mime))
+
     if ok and url:
-        ok2, _ = _try("launch_url", lambda: page.launch_url(url))
-        if ok2:
-            return True, "انفتح بتبويب جديد"
-
-        # 2) رابط تنزيل بعنصر <a>
         def _anchor():
             import js
             a = js.document.createElement("a")
             a.href = url
-            if download:
-                a.download = filename
-            a.target = "_blank"
+            a.download = filename          # التنزيل ما يحتاج إذن نوافذ
             js.document.body.appendChild(a)
             a.click()
             js.document.body.removeChild(a)
             return True
-        ok3, _ = _try("anchor click", _anchor)
-        if ok3:
-            return True, "تم التنزيل"
+        if _try("تنزيل بعنصر <a>", _anchor)[0]:
+            return True, "\n".join(LOG)
 
-        # 3) window.open مباشرة
         def _winopen():
             import js
-            js.window.open(url, "_blank")
+            w = js.window.open(url, "_blank")
+            if w is None:
+                raise RuntimeError("المتصفح حظر فتح النافذة")
             return True
-        ok4, _ = _try("window.open", _winopen)
-        if ok4:
-            return True, "انفتح بتبويب جديد"
+        if _try("window.open", _winopen)[0]:
+            return True, "\n".join(LOG)
 
-    # 4) data URL عبر Flet
+    def _launch():
+        page.launch_url(url if (ok and url) else "")
+        return True
+    _try("page.launch_url (ما نكدر نتأكد)", _launch)
+
     def _dataurl():
         import base64
         raw = data.encode("utf-8") if isinstance(data, str) else data
         b64 = base64.b64encode(raw).decode("ascii")
         page.launch_url("data:%s;base64,%s" % (mime, b64))
         return True
-    ok5, _ = _try("data URL", _dataurl)
-    if ok5:
-        return True, "انفتح بتبويب جديد"
+    _try("data URL", _dataurl)
 
-    # 5) سطح مكتب
     def _desktop():
         import webbrowser
         folder = os.path.join(os.path.expanduser("~"), "exam_maker")
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, filename)
-        mode, payload = ("w", data) if isinstance(data, str) else ("wb", data)
-        with open(path, mode, **({"encoding": "utf-8"} if mode == "w" else {})) as f:
-            f.write(payload)
+        if isinstance(data, str):
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(data)
+        else:
+            with open(path, "wb") as f:
+                f.write(data)
         if not download:
             webbrowser.open("file:///" + os.path.abspath(path).replace("\\", "/"))
         return path
-    ok6, path = _try("حفظ محلي", _desktop)
-    if ok6:
-        return True, str(path)
+    if _try("حفظ محلي", _desktop)[0]:
+        return True, "\n".join(LOG)
 
     return False, "\n".join(LOG)
 
@@ -518,10 +534,8 @@ class MobileApp:
             return
         ok, info = deliver(self.page, html, "text/html;charset=utf-8",
                            "exam_paper.html", download=False)
-        if ok:
-            toast(self.page, "افتح قائمة المشاركة ← طباعة ← حفظ بصيغة PDF")
-        else:
-            show_report(self.page, "ما كدرت أفتح الورقة", info)
+        show_report(self.page,
+                    "الورقة ✅" if ok else "ما كدرت أفتح الورقة", info)
 
     def do_word(self, e):
         d = self.collect()
@@ -535,10 +549,8 @@ class MobileApp:
             self.page, data,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             name, download=True)
-        if ok:
-            toast(self.page, "تم تنزيل ملف Word ✅")
-        else:
-            show_report(self.page, "ما كدرت أنزّل ملف Word", info)
+        show_report(self.page,
+                    "Word ✅" if ok else "ما كدرت أنزّل ملف Word", info)
 
     def do_save(self, e):
         try:
